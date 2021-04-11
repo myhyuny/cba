@@ -1,5 +1,5 @@
-/.gradle
+/.cargo
 /.idea
 /.vscode
-/build
-/out
+/target
+*.nosync

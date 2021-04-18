@@ -6,19 +6,24 @@
 
 ### macOS
 
-- Homebrew
+- [Homebrew](https://brew.sh)
 ```shell
 brew install p7zip
 ```
 
-- MacPorts
+- [MacPorts](https://www.macports.org)
 ```shell
 port install p7zip
 ```
 
 ### Windows
 
-- https://www.7-zip.org
+- [Chocolatey](https://chocolatey.org)
+```shell
+choco install 7zip.install
+```
+- Download
+    * https://www.7-zip.org
 
 혹시 위에 설치해도 안되면 7z 파일이 있는 곳을 PATH에 등록해줄것.
 

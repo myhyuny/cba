@@ -3,8 +3,13 @@ use std::{cmp::Ordering, env, fs::{metadata, read_dir, rename}, io, path::PathBu
 use regex::Regex;
 
 fn main() {
-    let seven_zip = match ["7z", "/usr/local/bin/7z", "/opt/local/bin/7z"].iter()
-        .find(|&&p| Command::new(p).stdout(Stdio::null()).spawn().is_ok()) {
+    let seven_zip = match [
+        "7z",
+        "/usr/local/bin/7z",
+        "/opt/local/bin/7z",
+        r"C:\Program Files\7-Zip\7z",
+        r"C:\Program Files (x86)\7-Zip\7z",
+    ].iter().find(|&&p| Command::new(p).stdout(Stdio::null()).spawn().is_ok()) {
         Some(&c) => c,
         None => exit_error("7-zip is not installed."),
     };

@@ -8,7 +8,7 @@
 
 - [Homebrew](https://brew.sh)
 ```shell
-brew install p7zip
+brew install sevenzip
 ```
 
 - [MacPorts](https://www.macports.org)

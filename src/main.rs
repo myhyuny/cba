@@ -1,12 +1,14 @@
-use std::{cmp::Ordering, env, fs::{metadata, read_dir, rename}, io, path::PathBuf, process::{Command, exit, Stdio}};
+use std::{cmp::Ordering, env, fs::{read_dir, rename}, io, path::PathBuf, process::{Command, exit, Stdio}};
 
 use regex::Regex;
 
 fn main() {
     let seven_zip = match [
-        "7z",
-        "/usr/local/bin/7z",
-        "/opt/local/bin/7z",
+        r"7z",
+        r"7zz",
+        r"/usr/local/bin/7z",
+        r"/opt/local/bin/7z",
+        r"/opt/homebrew/bin/7zz",
         r"C:\Program Files\7-Zip\7z",
         r"C:\Program Files (x86)\7-Zip\7z",
     ].iter().find(|&&p| Command::new(p).stdout(Stdio::null()).spawn().is_ok()) {
@@ -69,11 +71,10 @@ fn main() {
             dir.join(format!("{}{}.{}", "0".repeat(numbers - num.len()), num, ext))
         }).collect::<Vec<_>>();
 
-        let sources: Vec<PathBuf>;
-        if targets.iter().find(|&f| images.contains(f)).is_none() {
-            sources = images
+        let sources = if targets.iter().find(|&f| images.contains(f)).is_none() {
+            images
         } else {
-            sources = images.iter()
+            let sources = images.iter()
                 .map(|b| PathBuf::from(format!(
                     "{}/_{}",
                     b.parent().unwrap().to_str().unwrap(),
@@ -82,7 +83,8 @@ fn main() {
             if let Err(e) = rename_all(&images, &sources) {
                 exit_error(e);
             }
-        }
+            sources
+        };
 
         if let Err(e) = rename_all(&sources, &targets) {
             exit_error(e);
@@ -94,17 +96,8 @@ fn main() {
             "-mx=9".to_string(),
         ];
 
-        if targets.iter().map(|b| metadata(b).unwrap().len()).sum::<u64>() > 10_485_760 {
-            args.push("-tzip".to_string());
-            args.push(format!("{}.cbz", dir.display()));
-        } else {
-            args.push("-t7z".to_string());
-            args.push("-m0=lzma2".to_string());
-            args.push("-mfb=64".to_string());
-            args.push("-md=32m".to_string());
-            args.push("-ms=on".to_string());
-            args.push(format!("{}.cb7", dir.display()));
-        }
+        args.push("-tzip".to_string());
+        args.push(format!("{}.cbz", dir.display()));
 
         for file in &targets {
             args.push(file.display().to_string());

@@ -12,4 +12,5 @@ opt-level = 2
 lto = true
 
 [dependencies]
+lazy_static = "1.4"
 regex = "1"

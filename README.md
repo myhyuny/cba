@@ -36,7 +36,3 @@ choco install 7zip.install
 ```shell
 cba [directory...]
 ```
-
-### Finder
-
-cba를 빌드해서 원하는 경로에 설치하고 automator 디렉토리의 안의 "Compress CBA.workflow"를 Automator 로 불러와 Run Shell Script 를 cba 설치한 경로에 맞게 수정해서 설치후 사용.

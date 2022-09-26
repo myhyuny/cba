@@ -1,3 +1,5 @@
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::{
     cmp::Ordering,
     env,
@@ -6,8 +8,6 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-
-use regex::Regex;
 
 #[cfg(target_os = "windows")]
 const SEVEN_ZIP_PATHS: [&str; 4] = [
@@ -48,8 +48,6 @@ fn main() -> Result<(), Error> {
         None => return Err(Error::from("7-zip is not installed.")),
     };
 
-    let regex = Regex::new(r"(\d+)")?;
-
     for dir in &dirs {
         let mut images = match read_dir(&dir) {
             Ok(dir) => dir
@@ -75,20 +73,31 @@ fn main() -> Result<(), Error> {
         }
 
         images.sort_by(|a, b| {
-            let mut ai = regex.captures_iter(a.file_name().and_then(OsStr::to_str).unwrap());
-            let mut bi = regex.captures_iter(b.file_name().and_then(OsStr::to_str).unwrap());
+            lazy_static! {
+                static ref REGEX: Regex = Regex::new(r"(\d+)").unwrap();
+            }
 
-            loop {
-                if let (Some(ac), Some(bc)) = (ai.next(), bi.next()) {
-                    if let (Ok(an), Ok(bn)) = (ac[1].parse::<u64>(), bc[1].parse::<u64>()) {
+            if let (Some(mut ai), Some(mut bi)) = (
+                a.file_name()
+                    .and_then(OsStr::to_str)
+                    .map(|t| REGEX.captures_iter(t)),
+                b.file_name()
+                    .and_then(OsStr::to_str)
+                    .map(|t| REGEX.captures_iter(t)),
+            ) {
+                loop {
+                    if let (Some(an), Some(bn)) = (
+                        ai.next().and_then(|c| c[1].parse::<u64>().ok()),
+                        bi.next().and_then(|c| c[1].parse::<u64>().ok()),
+                    ) {
                         let cmp = an.cmp(&bn);
                         if cmp != Ordering::Equal {
                             return cmp;
                         }
+                        continue;
                     }
-                    continue;
+                    break;
                 }
-                break;
             }
 
             return a.cmp(b);

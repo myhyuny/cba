@@ -12,5 +12,6 @@ opt-level = 2
 lto = true
 
 [dependencies]
+clap = { version = "4", features = [ "derive" ] }
 lazy_static = "1.4"
 regex = "1"

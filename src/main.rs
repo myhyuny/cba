@@ -1,8 +1,8 @@
+use clap::Parser;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
     cmp::Ordering,
-    env,
     ffi::OsStr,
     fs::{read_dir, rename},
     path::{Path, PathBuf},
@@ -11,9 +11,9 @@ use std::{
 
 #[cfg(target_os = "windows")]
 const SEVEN_ZIP_PATHS: [&str; 4] = [
-    r"7z",
-    r"C:\Program Files\7-Zip\7z",
-    r"C:\Program Files (x86)\7-Zip\7z",
+    r"7z.exe",
+    r"C:\Program Files\7-Zip\7z.exe",
+    r"C:\Program Files (x86)\7-Zip\7z.exe",
 ];
 
 #[cfg(not(target_os = "windows"))]
@@ -28,18 +28,14 @@ const SEVEN_ZIP_PATHS: [&str; 8] = [
     r"/opt/homebrew/bin/7z",
 ];
 
-fn main() -> Result<(), Error> {
-    let dirs = env::args()
-        .skip(1)
-        .map(PathBuf::from)
-        .filter(|r| r.is_dir())
-        .collect::<Vec<_>>();
-    if dirs.is_empty() {
-        println!("Usage: cba [dirs...]");
-        println!();
-        return Ok(());
-    }
+#[derive(Parser)]
+struct Args {
+    #[arg(required = true)]
+    dirs: Vec<PathBuf>,
+}
 
+fn main() -> Result<(), Error> {
+    let args = Args::parse();
     let seven_zip = match SEVEN_ZIP_PATHS
         .iter()
         .find(|&&p| Command::new(p).stdout(Stdio::null()).spawn().is_ok())
@@ -48,8 +44,8 @@ fn main() -> Result<(), Error> {
         None => return Err(Error::from("7-zip is not installed.")),
     };
 
-    for dir in &dirs {
-        let mut images = match read_dir(&dir) {
+    for dir in &args.dirs {
+        let mut images = match read_dir(dir) {
             Ok(dir) => dir
                 .filter_map(|r| r.map(|e| e.path()).ok())
                 .filter(|r| !r.is_dir())
@@ -61,7 +57,8 @@ fn main() -> Result<(), Error> {
                         .unwrap()
                         .as_str()
                     {
-                        "GIF" | "HEIC" | "JPG" | "JPEG" | "PNG" | "TIF" | "TIFF" | "WEBP" => true,
+                        "AVIF" | "GIF" | "HEIC" | "JPG" | "JPEG" | "PNG" | "TIF" | "TIFF"
+                        | "WEBP" => true,
                         _ => false,
                     }
                 })

@@ -44,13 +44,13 @@ fn main() -> Result<(), Error> {
         None => return Err(Error::from("7-zip is not installed.")),
     };
 
-    for dir in &args.dirs {
-        let mut images = match read_dir(dir) {
+    for path in &args.dirs {
+        let mut images = match read_dir(path) {
             Ok(dir) => dir
-                .filter_map(|r| r.map(|e| e.path()).ok())
-                .filter(|r| !r.is_dir())
-                .filter(|r| {
-                    match r
+                .filter_map(|r| r.map(|d| d.path()).ok())
+                .filter(|p| !p.is_dir())
+                .filter(|p| {
+                    match p
                         .extension()
                         .and_then(OsStr::to_str)
                         .map(str::to_uppercase)
@@ -69,18 +69,17 @@ fn main() -> Result<(), Error> {
             continue;
         }
 
+        lazy_static! {
+            static ref NUMBER_REGEX: Regex = Regex::new(r"(\d+)").unwrap();
+        }
         images.sort_by(|a, b| {
-            lazy_static! {
-                static ref REGEX: Regex = Regex::new(r"(\d+)").unwrap();
-            }
-
             if let (Some(mut ai), Some(mut bi)) = (
                 a.file_name()
                     .and_then(OsStr::to_str)
-                    .map(|t| REGEX.captures_iter(t)),
+                    .map(|n| NUMBER_REGEX.captures_iter(n)),
                 b.file_name()
                     .and_then(OsStr::to_str)
-                    .map(|t| REGEX.captures_iter(t)),
+                    .map(|n| NUMBER_REGEX.captures_iter(n)),
             ) {
                 loop {
                     if let (Some(an), Some(bn)) = (
@@ -114,7 +113,7 @@ fn main() -> Result<(), Error> {
                     "JPEG" => "JPG".to_owned(),
                     s => s.to_owned(),
                 };
-                dir.join(format!(
+                path.join(format!(
                     "{}{}.{}",
                     "0".repeat(numbers - num.len()),
                     num,
@@ -123,7 +122,7 @@ fn main() -> Result<(), Error> {
             })
             .collect::<Vec<_>>();
 
-        let sources = if targets.iter().find(|&f| images.contains(f)).is_none() {
+        let sources = if targets.iter().find(|&p| images.contains(p)).is_none() {
             images
         } else {
             let targets = images
@@ -149,7 +148,7 @@ fn main() -> Result<(), Error> {
             "-mx=9".to_owned(),
             "-mfb=258".to_owned(),
             "-scsUTF-8".to_owned(),
-            format!("{}.cbz", dir.display()),
+            format!("{}.cbz", path.display()),
         ];
 
         for file in &targets {
@@ -159,14 +158,15 @@ fn main() -> Result<(), Error> {
         Command::new(seven_zip)
             .args(args)
             .stdout(Stdio::null())
-            .spawn()?;
+            .spawn()?
+            .wait()?;
     }
 
     return Ok(());
 }
 
 fn rename_all(sources: &Vec<PathBuf>, targets: &Vec<PathBuf>) -> Result<(), Error> {
-    for i in 0..sources.len() {
+    for i in 0..usize::min(sources.len(), targets.len()) {
         rename(&sources[i], &targets[i])?;
     }
     return Ok(());

@@ -10,7 +10,7 @@ use std::{
 };
 
 #[cfg(target_os = "windows")]
-const SEVEN_ZIP_PATHS: [&str; 4] = [
+const SEVEN_ZIP_PATHS: [&str; 3] = [
     r"7z.exe",
     r"C:\Program Files\7-Zip\7z.exe",
     r"C:\Program Files (x86)\7-Zip\7z.exe",

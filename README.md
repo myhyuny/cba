@@ -18,9 +18,9 @@ port install p7zip
 
 ### Windows
 
-- [Chocolatey](https://chocolatey.org)
+- Windows Package Manager
 ```shell
-choco install 7zip.install
+winget install 7zip.7zip
 ```
 - Download
     * https://www.7-zip.org

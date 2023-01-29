@@ -35,7 +35,14 @@ struct Args {
 }
 
 fn main() -> Result<(), Error> {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use winapi::um::{wincon::SetConsoleOutputCP, winnls::CP_UTF8};
+        SetConsoleOutputCP(CP_UTF8);
+    }
+
     let args = Args::parse();
+
     let seven_zip = match SEVEN_ZIP_PATHS
         .iter()
         .find(|&&p| Command::new(p).stdout(Stdio::null()).spawn().is_ok())

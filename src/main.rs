@@ -17,15 +17,21 @@ const SEVEN_ZIP_PATHS: [&str; 3] = [
 ];
 
 #[cfg(not(target_os = "windows"))]
-const SEVEN_ZIP_PATHS: [&str; 8] = [
+const SEVEN_ZIP_PATHS: [&str; 14] = [
     r"7zz",
+    r"/usr/bin/7zz",
     r"/usr/local/bin/7zz",
     r"/opt/local/bin/7zz",
     r"/opt/homebrew/bin/7zz",
     r"7z",
+    r"/usr/bin/7z",
     r"/usr/local/bin/7z",
     r"/opt/local/bin/7z",
     r"/opt/homebrew/bin/7z",
+    r"7zr",
+    r"/usr/bin/7zr",
+    r"/usr/local/bin/7zr",
+    r"/opt/local/bin/7zr",
 ];
 
 #[derive(Parser)]

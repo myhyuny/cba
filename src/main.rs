@@ -1,6 +1,5 @@
 use clap::Parser;
-use lazy_static::lazy_static;
-use regex::Regex;
+use lazy_regex::{lazy_regex, Lazy, Regex};
 use std::{
     cmp::Ordering,
     ffi::OsStr,
@@ -49,50 +48,44 @@ fn main() -> Result<(), Error> {
 
     let args = Args::parse();
 
-    let seven_zip = match SEVEN_ZIP_PATHS
+    let seven_zip = *SEVEN_ZIP_PATHS
         .iter()
         .find(|&&p| Command::new(p).stdout(Stdio::null()).spawn().is_ok())
-    {
-        Some(&c) => c,
-        None => return Err(Error::from("7-zip is not installed.")),
-    };
+        .ok_or("7-zip is not installed.")?;
 
     for path in &args.dirs {
-        let mut images = match read_dir(path) {
-            Ok(dir) => dir
-                .filter_map(|r| r.map(|d| d.path()).ok())
-                .filter(|p| !p.is_dir())
-                .filter(|p| {
-                    match p
-                        .extension()
-                        .and_then(OsStr::to_str)
-                        .map(str::to_uppercase)
-                        .unwrap()
-                        .as_str()
-                    {
-                        "AVIF" | "GIF" | "HEIC" | "JPG" | "JPEG" | "PNG" | "TIF" | "TIFF"
-                        | "WEBP" => true,
-                        _ => false,
+        let mut images = read_dir(path)?
+            .filter_map(|r| r.map(|d| d.path()).ok())
+            .filter(|p| !p.is_dir())
+            .filter(|p| {
+                match p
+                    .extension()
+                    .and_then(OsStr::to_str)
+                    .map(str::to_uppercase)
+                    .unwrap()
+                    .as_str()
+                {
+                    "AVIF" | "GIF" | "HEIC" | "JPG" | "JPEG" | "PNG" | "TIF" | "TIFF" | "WEBP" => {
+                        true
                     }
-                })
-                .collect::<Vec<_>>(),
-            Err(e) => return Err(Error::from(e)),
-        };
+                    _ => false,
+                }
+            })
+            .collect::<Vec<_>>();
         if images.is_empty() {
             continue;
         }
 
-        lazy_static! {
-            static ref NUMBER_REGEX: Regex = Regex::new(r"(\d+)").unwrap();
-        }
         images.sort_by(|a, b| {
+            static REGEX: Lazy<Regex> = lazy_regex!(r"(\d+)");
+
             if let (Some(mut ai), Some(mut bi)) = (
                 a.file_name()
                     .and_then(OsStr::to_str)
-                    .map(|n| NUMBER_REGEX.captures_iter(n)),
+                    .map(|n| REGEX.captures_iter(n)),
                 b.file_name()
                     .and_then(OsStr::to_str)
-                    .map(|n| NUMBER_REGEX.captures_iter(n)),
+                    .map(|n| REGEX.captures_iter(n)),
             ) {
                 loop {
                     if let (Some(an), Some(bn)) = (

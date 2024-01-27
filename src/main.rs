@@ -4,7 +4,7 @@ use std::{
     cmp::Ordering,
     ffi::OsStr,
     fs::{read_dir, rename},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
@@ -33,6 +33,10 @@ const SEVEN_ZIP_PATHS: [&str; 14] = [
     r"/opt/local/bin/7zr",
 ];
 
+const EXTENSIONS: [&str; 9] = [
+    "AVIF", "GIF", "HEIC", "JPG", "JPEG", "PNG", "TIF", "TIFF", "WEBP",
+];
+
 #[derive(Parser)]
 struct Args {
     #[arg(required = true)]
@@ -54,24 +58,20 @@ fn main() -> Result<(), Error> {
         .ok_or("7-zip is not installed.")?;
 
     for path in &args.dirs {
-        let mut images = read_dir(path)?
-            .filter_map(|r| r.map(|d| d.path()).ok())
-            .filter(|p| !p.is_dir())
-            .filter(|p| {
-                match p
+        let mut images = vec![];
+        for dir in read_dir(path)? {
+            let path = dir?.path();
+            if !path.is_dir()
+                && path
                     .extension()
                     .and_then(OsStr::to_str)
                     .map(str::to_uppercase)
-                    .unwrap()
-                    .as_str()
-                {
-                    "AVIF" | "GIF" | "HEIC" | "JPG" | "JPEG" | "PNG" | "TIF" | "TIFF" | "WEBP" => {
-                        true
-                    }
-                    _ => false,
-                }
-            })
-            .collect::<Vec<_>>();
+                    .filter(|s| EXTENSIONS.contains(&s.as_str()))
+                    .is_some()
+            {
+                images.push(path);
+            }
+        }
         if images.is_empty() {
             continue;
         }
@@ -105,40 +105,32 @@ fn main() -> Result<(), Error> {
             return a.cmp(b);
         });
 
-        let numbers = f64::ceil(f64::log10(images.len() as f64)) as usize;
+        let names = digit(images.len());
         let targets = (0..images.len())
-            .map(|i| {
-                let num = i.to_string();
-                let ext = match images[i]
+            .filter_map(|i| {
+                let ext = images[i]
                     .extension()
-                    .and_then(OsStr::to_str)
-                    .map(str::to_uppercase)
-                    .unwrap()
-                    .as_str()
-                {
+                    .and_then(OsStr::to_str)?
+                    .to_uppercase();
+                let ext = match ext.as_str() {
                     "JPEG" => "JPG".to_owned(),
-                    s => s.to_owned(),
+                    _ => ext,
                 };
-                path.join(format!(
-                    "{}{}.{}",
-                    "0".repeat(numbers - num.len()),
-                    num,
-                    ext
-                ))
+                let image = path.join(format!("{}{}.{}", "0".repeat(names - digit(i)), i, ext));
+                return Some(image);
             })
             .collect::<Vec<_>>();
 
         let sources = if targets.iter().find(|&p| images.contains(p)).is_none() {
             images
         } else {
+            let parent = path.display();
             let targets = images
                 .iter()
-                .map(|b| {
-                    PathBuf::from(format!(
-                        "{}/_{}",
-                        b.parent().and_then(Path::to_str).unwrap(),
-                        b.file_name().and_then(OsStr::to_str).unwrap(),
-                    ))
+                .filter_map(|b| {
+                    let child = b.file_name().and_then(OsStr::to_str)?;
+                    let path = PathBuf::from(format!("{}/_{}", parent, child));
+                    return Some(path);
                 })
                 .collect();
             rename_all(&images, &targets)?;
@@ -176,6 +168,10 @@ fn rename_all(sources: &Vec<PathBuf>, targets: &Vec<PathBuf>) -> Result<(), Erro
         rename(&sources[i], &targets[i])?;
     }
     return Ok(());
+}
+
+fn digit(i: usize) -> usize {
+    return (i as f64).log10().floor() as usize + 1;
 }
 
 pub type Error = Box<dyn std::error::Error>;

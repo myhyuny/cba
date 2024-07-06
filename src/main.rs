@@ -3,35 +3,11 @@ use lazy_regex::{lazy_regex, Lazy, Regex};
 use std::{
     cmp::Ordering,
     ffi::OsStr,
-    fs::{read_dir, rename},
+    fs::{read_dir, rename, File},
+    io::{copy, Write},
     path::PathBuf,
-    process::{Command, Stdio},
 };
-
-#[cfg(target_os = "windows")]
-const SEVEN_ZIP_PATHS: [&str; 3] = [
-    r"7z.exe",
-    r"C:\Program Files\7-Zip\7z.exe",
-    r"C:\Program Files (x86)\7-Zip\7z.exe",
-];
-
-#[cfg(not(target_os = "windows"))]
-const SEVEN_ZIP_PATHS: [&str; 14] = [
-    r"7zz",
-    r"/usr/bin/7zz",
-    r"/usr/local/bin/7zz",
-    r"/opt/local/bin/7zz",
-    r"/opt/homebrew/bin/7zz",
-    r"7z",
-    r"/usr/bin/7z",
-    r"/usr/local/bin/7z",
-    r"/opt/local/bin/7z",
-    r"/opt/homebrew/bin/7z",
-    r"7zr",
-    r"/usr/bin/7zr",
-    r"/usr/local/bin/7zr",
-    r"/opt/local/bin/7zr",
-];
+use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 const EXTENSIONS: [&str; 9] = [
     "AVIF", "GIF", "HEIC", "JPG", "JPEG", "PNG", "TIF", "TIFF", "WEBP",
@@ -51,11 +27,6 @@ fn main() -> Result<(), Error> {
     }
 
     let args = Args::parse();
-
-    let seven_zip = *SEVEN_ZIP_PATHS
-        .iter()
-        .find(|&&p| Command::new(p).stdout(Stdio::null()).spawn().is_ok())
-        .ok_or("7-zip is not installed.")?;
 
     for path in &args.dirs {
         let mut images = vec![];
@@ -139,25 +110,25 @@ fn main() -> Result<(), Error> {
 
         rename_all(&sources, &targets)?;
 
-        let mut args = vec![
-            "a".to_owned(),
-            "-bd".to_owned(),
-            "-tzip".to_owned(),
-            "-mx=9".to_owned(),
-            "-mfb=258".to_owned(),
-            "-scsUTF-8".to_owned(),
-            format!("{}.cbz", path.display()),
-        ];
+        let options = SimpleFileOptions::default()
+            .compression_method(CompressionMethod::Deflated)
+            .compression_level(Some(9));
 
-        for file in &targets {
-            args.push(file.display().to_string());
+        let file = File::create(format!("{}.cbz", path.display()))?;
+        let mut zip = ZipWriter::new(file);
+
+        for path in targets {
+            let name = path
+                .file_name()
+                .and_then(OsStr::to_str)
+                .ok_or("invalid file name")?;
+            zip.start_file(name, options)?;
+            let mut file = File::open(&path)?;
+            copy(&mut file, &mut zip)?;
+            println!("{}", &name);
         }
 
-        Command::new(seven_zip)
-            .args(args)
-            .stdout(Stdio::null())
-            .spawn()?
-            .wait()?;
+        zip.flush()?;
     }
 
     return Ok(());

@@ -7,10 +7,49 @@ use std::{
     io::{copy, Write},
     path::PathBuf,
 };
-use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+use zip::{
+    write::SimpleFileOptions,
+    CompressionMethod::{self, Deflated, Stored},
+    ZipWriter,
+};
 
-const EXTENSIONS: [&str; 9] = [
-    "AVIF", "GIF", "HEIC", "JPG", "JPEG", "PNG", "TIF", "TIFF", "WEBP",
+struct Extension<'n> {
+    name: &'n str,
+    method: CompressionMethod,
+    level: Option<i64>,
+}
+
+const EXTENSIONS: [Extension; 6] = [
+    Extension {
+        name: "AVIF",
+        method: Stored,
+        level: None,
+    },
+    Extension {
+        name: "GIF",
+        method: Deflated,
+        level: Some(9),
+    },
+    Extension {
+        name: "JPG",
+        method: Deflated,
+        level: Some(9),
+    },
+    Extension {
+        name: "JPEG",
+        method: Deflated,
+        level: Some(9),
+    },
+    Extension {
+        name: "PNG",
+        method: Stored,
+        level: None,
+    },
+    Extension {
+        name: "WEBP",
+        method: Stored,
+        level: None,
+    },
 ];
 
 #[derive(Parser)]
@@ -37,7 +76,7 @@ fn main() -> Result<(), Error> {
                     .extension()
                     .and_then(OsStr::to_str)
                     .map(str::to_uppercase)
-                    .filter(|s| EXTENSIONS.contains(&s.as_str()))
+                    .filter(|s| EXTENSIONS.iter().any(|e| e.name == s))
                     .is_some()
             {
                 images.push(path);
@@ -110,10 +149,6 @@ fn main() -> Result<(), Error> {
 
         rename_all(&sources, &targets)?;
 
-        let options = SimpleFileOptions::default()
-            .compression_method(CompressionMethod::Deflated)
-            .compression_level(Some(9));
-
         let file = File::create(format!("{}.cbz", path.display()))?;
         let mut zip = ZipWriter::new(file);
 
@@ -122,6 +157,16 @@ fn main() -> Result<(), Error> {
                 .file_name()
                 .and_then(OsStr::to_str)
                 .ok_or("invalid file name")?;
+            let ext = path
+                .extension()
+                .and_then(OsStr::to_str)
+                .and_then(|s| EXTENSIONS.iter().find(|e| e.name == s))
+                .ok_or("invalid extension")?;
+
+            let options = SimpleFileOptions::default()
+                .compression_method(ext.method)
+                .compression_level(ext.level);
+
             zip.start_file(name, options)?;
             let mut file = File::open(&path)?;
             copy(&mut file, &mut zip)?;

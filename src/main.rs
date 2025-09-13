@@ -1,6 +1,6 @@
 use clap::Parser;
 use lazy_regex::{lazy_regex, Lazy, Regex};
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -85,14 +85,13 @@ fn main() -> Result<(), Error> {
         let names = digit(images.len());
 
         struct Image {
-            index: usize,
             file: File,
             name: String,
             compressed: bool,
         }
 
-        let mut results = images
-            .par_iter()
+        let results = images
+            .into_par_iter()
             .enumerate()
             .map(|(i, image)| -> Result<Image, Error> {
                 let ext = image
@@ -133,7 +132,6 @@ fn main() -> Result<(), Error> {
                     tmp.seek(SeekFrom::Start(0))?;
 
                     return Ok(Image {
-                        index: i,
                         file: tmp,
                         name,
                         compressed: false,
@@ -142,7 +140,6 @@ fn main() -> Result<(), Error> {
                     file.seek(SeekFrom::Start(0))?;
 
                     return Ok(Image {
-                        index: i,
                         file,
                         name,
                         compressed: true,
@@ -150,8 +147,6 @@ fn main() -> Result<(), Error> {
                 }
             })
             .collect::<Result<Vec<_>, _>>()?;
-
-        results.sort_by(|a, b| a.index.cmp(&b.index));
 
         let file = File::create(format!("{}.cbz", path.display()))?;
         let buf = BufWriter::new(file);

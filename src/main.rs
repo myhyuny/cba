@@ -6,7 +6,7 @@ use std::{
     collections::HashSet,
     ffi::OsStr,
     fs::{read_dir, File},
-    io::{copy, BufReader, BufWriter, Seek, SeekFrom, Write},
+    io::{copy, BufReader, Write},
     path::PathBuf,
 };
 use tempfile::tempfile;
@@ -15,7 +15,7 @@ use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 static NUMBER_REGEX: Lazy<Regex> = lazy_regex!(r"(\d+)");
 
 static EXTENSIONS: Lazy<HashSet<String>> = Lazy::new(|| {
-    ["AVIF", "GIF", "JPG", "JPEG", "PNG", "WEBP"]
+    ["avif", "gif", "jpg", "jpeg", "png", "webp"]
         .iter()
         .map(|&s| s.to_string())
         .collect()
@@ -37,6 +37,8 @@ fn main() -> Result<(), Error> {
     let args = Args::parse();
 
     for path in &args.dirs {
+        println!("{}", path.display());
+
         let mut images = Vec::new();
         for dir in read_dir(path)? {
             let path = dir?.path();
@@ -44,7 +46,7 @@ fn main() -> Result<(), Error> {
                 && path
                     .extension()
                     .and_then(OsStr::to_str)
-                    .map(str::to_uppercase)
+                    .map(str::to_lowercase)
                     .filter(|s| EXTENSIONS.contains(s))
                     .is_some()
             {
@@ -84,89 +86,83 @@ fn main() -> Result<(), Error> {
 
         let names = digit(images.len());
 
-        struct Image {
-            file: File,
-            name: String,
-            compressed: bool,
-        }
-
         let results = images
             .into_par_iter()
             .enumerate()
-            .map(|(i, image)| -> Result<Image, Error> {
+            .map(|(i, image)| -> Result<(File, bool), Error> {
                 let ext = image
                     .extension()
                     .and_then(OsStr::to_str)
                     .map(|s| {
                         let e = s.to_uppercase();
                         return match e.as_str() {
-                            "JPEG" => "JPG".to_owned(),
+                            "jpeg" => "jpg".to_owned(),
                             _ => e,
                         };
                     })
                     .ok_or("invalid file extension")?;
 
                 let name = format!("{}{}.{}", "0".repeat(names - digit(i)), i, ext);
+
                 let options = SimpleFileOptions::default()
                     .compression_method(CompressionMethod::Deflated)
-                    .compression_level(Some(15));
+                    .compression_level(Some(100))
+                    .with_zopfli_buffer(Some(1 << 20));
 
-                let mut tmp = tempfile()?;
+                let tmp = tempfile()?;
 
-                let mut zip = ZipWriter::new(BufWriter::new(&tmp));
+                let mut zip = ZipWriter::new(&tmp);
                 zip.start_file(&name, options)?;
 
-                let mut file = File::open(image)?;
-
+                let file = File::open(&image)?;
                 let mut reader = BufReader::new(&file);
 
                 copy(&mut reader, &mut zip)?;
                 zip.finish()?;
 
-                let original = file.metadata()?.len();
-                let compressed = tmp.metadata()?.len() - 22; // zip header size
+                let (compress, origins) = {
+                    let mut archive = ZipArchive::new(&tmp)?;
+                    let file = archive.by_index_raw(0)?;
+                    (file.compressed_size(), file.size())
+                };
 
-                println!("{}, {} -> {}", &name, original, compressed);
+                println!(
+                    "{} -> {}, {} -> {}",
+                    image
+                        .file_name()
+                        .and_then(OsStr::to_str)
+                        .ok_or("invalid filename")?,
+                    name,
+                    origins,
+                    compress,
+                );
 
-                if original > compressed {
-                    tmp.seek(SeekFrom::Start(0))?;
-
-                    return Ok(Image {
-                        file: tmp,
-                        name,
-                        compressed: false,
-                    });
-                } else {
-                    file.seek(SeekFrom::Start(0))?;
-
-                    return Ok(Image {
-                        file,
-                        name,
-                        compressed: true,
-                    });
-                }
+                return Ok((tmp, compress < origins));
             })
             .collect::<Result<Vec<_>, _>>()?;
 
         let file = File::create(format!("{}.cbz", path.display()))?;
-        let buf = BufWriter::new(file);
-        let mut zip = ZipWriter::new(buf);
+        let mut zip = ZipWriter::new(file);
 
-        for image in results {
-            if image.compressed {
+        for (image, compressed) in results {
+            let mut archive = ZipArchive::new(image)?;
+            if compressed {
+                let file = archive.by_index_raw(0)?;
+                zip.raw_copy_file(file)?;
+            } else {
+                let mut file = archive.by_index(0)?;
                 let options =
                     SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
-                zip.start_file(image.name, options)?;
-                let mut reader = BufReader::new(image.file);
-                copy(&mut reader, &mut zip)?;
-            } else {
-                let mut archived = ZipArchive::new(image.file)?;
-                let file = archived.by_index_raw(0)?;
-                zip.raw_copy_file(file)?;
+                zip.start_file(file.name(), options)?;
+                copy(&mut file, &mut zip)?;
             }
+
+            zip.flush()?;
         }
 
-        zip.flush()?;
+        zip.finish()?;
+
+        println!();
     }
 
     return Ok(());

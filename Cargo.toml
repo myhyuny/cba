@@ -12,6 +12,7 @@ opt-level = 2
 lto = true
 
 [dependencies]
+anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 lazy-regex = { version = "3", features = [
     "unicode-perl",

@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use clap::Parser;
 use lazy_regex::{lazy_regex, Lazy, Regex};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -27,7 +28,7 @@ struct Args {
     dirs: Vec<PathBuf>,
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<()> {
     #[cfg(target_os = "windows")]
     unsafe {
         use winapi::um::{wincon::SetConsoleOutputCP, winnls::CP_UTF8};
@@ -89,7 +90,7 @@ fn main() -> Result<(), Error> {
         let results = images
             .into_par_iter()
             .enumerate()
-            .map(|(i, image)| -> Result<(File, bool), Error> {
+            .map(|(i, image)| -> Result<(File, bool)> {
                 let ext = image
                     .extension()
                     .and_then(OsStr::to_str)
@@ -100,7 +101,7 @@ fn main() -> Result<(), Error> {
                             _ => e,
                         };
                     })
-                    .ok_or("invalid file extension")?;
+                    .context("invalid file extension")?;
 
                 let name = format!("{}{}.{}", "0".repeat(names - digit(i)), i, ext);
 
@@ -131,7 +132,7 @@ fn main() -> Result<(), Error> {
                     image
                         .file_name()
                         .and_then(OsStr::to_str)
-                        .ok_or("invalid filename")?,
+                        .context("invalid filename")?,
                     name,
                     origins,
                     compress,
@@ -171,5 +172,3 @@ fn main() -> Result<(), Error> {
 fn digit(i: usize) -> usize {
     return (i as f64).log10().floor() as usize + 1;
 }
-
-pub type Error = Box<dyn std::error::Error + Send + Sync>;

@@ -2,7 +2,7 @@
 name = "cba"
 version = "0.1.0"
 authors = ["Hyunmin Kang <myhyuny@live.com>"]
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,7 +19,7 @@ lazy-regex = { version = "3", features = [
 ], default-features = false }
 rayon = "1"
 tempfile = "3"
-zip = { version = "5", features = [
+zip = { version = "6", features = [
     "deflate-zopfli",
     "deflate-flate2-zlib",
 ], default-features = false }

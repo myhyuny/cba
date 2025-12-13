@@ -1,17 +1,17 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use lazy_regex::{lazy_regex, Lazy, Regex};
+use lazy_regex::{Lazy, Regex, lazy_regex};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
     cmp::Ordering,
     collections::HashSet,
     ffi::OsStr,
-    fs::{read_dir, File},
-    io::{copy, BufReader, Write},
+    fs::{File, read_dir},
+    io::{BufReader, Write, copy},
     path::PathBuf,
 };
 use tempfile::tempfile;
-use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
+use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 static NUMBER_REGEX: Lazy<Regex> = lazy_regex!(r"(\d+)");
 
@@ -107,7 +107,7 @@ fn main() -> Result<()> {
 
                 let options = SimpleFileOptions::default()
                     .compression_method(CompressionMethod::Deflated)
-                    .compression_level(Some(100))
+                    .compression_level(Some(264))
                     .with_zopfli_buffer(Some(1 << 20));
 
                 let tmp = tempfile()?;

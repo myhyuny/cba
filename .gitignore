@@ -87,7 +87,8 @@ Cargo.lock
 *.pdb
 
 ### VisualStudioCode ###
-.vscode
+.vscode/*
+!.vscode/extensions.json
 
 # Local History for Visual Studio Code
 .history/

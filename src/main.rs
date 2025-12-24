@@ -4,10 +4,9 @@ use lazy_regex::{Lazy, Regex, lazy_regex};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
     cmp::Ordering,
-    collections::HashSet,
     ffi::OsStr,
     fs::{File, read_dir},
-    io::{BufReader, Write, copy},
+    io::{BufReader, copy},
     path::PathBuf,
 };
 use tempfile::tempfile;
@@ -15,12 +14,7 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 static NUMBER_REGEX: Lazy<Regex> = lazy_regex!(r"(\d+)");
 
-static EXTENSIONS: Lazy<HashSet<String>> = Lazy::new(|| {
-    ["avif", "gif", "jpg", "jpeg", "png", "webp"]
-        .iter()
-        .map(|&s| s.to_string())
-        .collect()
-});
+static EXTENSIONS: &[&str] = &["avif", "gif", "jpg", "jpeg", "png", "webp"];
 
 #[derive(Parser)]
 struct Args {
@@ -48,7 +42,7 @@ fn main() -> Result<()> {
                     .extension()
                     .and_then(OsStr::to_str)
                     .map(str::to_lowercase)
-                    .filter(|s| EXTENSIONS.contains(s))
+                    .filter(|s| EXTENSIONS.binary_search(&s.as_ref()).is_ok())
                     .is_some()
             {
                 images.push(path);
@@ -86,6 +80,8 @@ fn main() -> Result<()> {
         });
 
         let names = digit(images.len());
+        let max_padding = if names > 0 { names - 1 } else { 0 };
+        let padding = "0".repeat(max_padding);
 
         let results = images
             .into_par_iter()
@@ -103,7 +99,9 @@ fn main() -> Result<()> {
                     })
                     .context("invalid file extension")?;
 
-                let name = format!("{}{}.{}", "0".repeat(names - digit(i)), i, ext);
+                let digit_count = digit(i);
+                let padding_count = names.saturating_sub(digit_count);
+                let name = format!("{}{}.{}", &padding[..padding_count], i, ext);
 
                 let options = SimpleFileOptions::default()
                     .compression_method(CompressionMethod::Deflated)
@@ -116,7 +114,7 @@ fn main() -> Result<()> {
                 zip.start_file(&name, options)?;
 
                 let file = File::open(&image)?;
-                let mut reader = BufReader::new(&file);
+                let mut reader = BufReader::with_capacity(64 * 1024, &file);
 
                 copy(&mut reader, &mut zip)?;
                 zip.finish()?;
@@ -157,8 +155,6 @@ fn main() -> Result<()> {
                 zip.start_file(file.name(), options)?;
                 copy(&mut file, &mut zip)?;
             }
-
-            zip.flush()?;
         }
 
         zip.finish()?;
@@ -170,5 +166,5 @@ fn main() -> Result<()> {
 }
 
 fn digit(i: usize) -> usize {
-    return (i as f64).log10().floor() as usize + 1;
+    return i.checked_ilog10().map_or(1, |d| d as usize + 1);
 }

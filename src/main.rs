@@ -12,9 +12,7 @@ use std::{
 use tempfile::tempfile;
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 
-static NUMBER_REGEX: Lazy<Regex> = lazy_regex!(r"(\d+)");
-
-static EXTENSIONS: &[&str] = &["avif", "gif", "jpg", "jpeg", "png", "webp"];
+static EXTENSIONS: [&str; 6] = ["avif", "gif", "jpeg", "jpg", "png", "webp"];
 
 #[derive(Parser)]
 struct Args {
@@ -53,6 +51,8 @@ fn main() -> Result<()> {
         }
 
         images.sort_by(|a, b| {
+            static NUMBER_REGEX: Lazy<Regex> = lazy_regex!(r"(\d+)");
+
             if let (Some(mut ai), Some(mut bi)) = (
                 a.file_name()
                     .and_then(OsStr::to_str)
